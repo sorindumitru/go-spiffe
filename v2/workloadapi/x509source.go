@@ -39,7 +39,7 @@ func NewX509Source(ctx context.Context, options ...X509SourceOption) (_ *X509Sou
 		picker: config.picker,
 	}
 
-	s.watcher, err = newWatcher(ctx, config.watcher, s.setX509Context, nil)
+	s.watcher, err = newWatcher(ctx, config.watcher, s.setX509Context, nil, nil)
 	if err != nil {
 		return nil, err
 	}

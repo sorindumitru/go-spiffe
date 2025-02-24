@@ -12,6 +12,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/proto/spiffe/workload"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
+	"github.com/spiffe/go-spiffe/v2/svid/witsvid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 
 	"google.golang.org/grpc"
@@ -81,6 +82,30 @@ func (c *Client) FetchX509SVID(ctx context.Context) (*x509svid.SVID, error) {
 	return svids[0], nil
 }
 
+// FetchWITSVID fetches the default WIT-SVID, i.e. the first in the list
+// returned by the Workload API.
+func (c *Client) FetchWITSVID(ctx context.Context) (*witsvid.SVID, error) {
+	ctx, cancel := context.WithCancel(withHeader(ctx))
+	defer cancel()
+
+	stream, err := c.wlClient.FetchWITSVID(ctx, &workload.WITSVIDRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := stream.Recv()
+	if err != nil {
+		return nil, err
+	}
+
+	svids, err := parseWITSVIDs(resp, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return svids[0], nil
+}
+
 // FetchX509SVIDs fetches all X509-SVIDs.
 func (c *Client) FetchX509SVIDs(ctx context.Context) ([]*x509svid.SVID, error) {
 	ctx, cancel := context.WithCancel(withHeader(ctx))
@@ -97,6 +122,24 @@ func (c *Client) FetchX509SVIDs(ctx context.Context) ([]*x509svid.SVID, error) {
 	}
 
 	return parseX509SVIDs(resp, false)
+}
+
+// FetchWITSVIDs fetches all WIT-SVIDs.
+func (c *Client) FetchWITSVIDs(ctx context.Context) ([]*witsvid.SVID, error) {
+	ctx, cancel := context.WithCancel(withHeader(ctx))
+	defer cancel()
+
+	stream, err := c.wlClient.FetchWITSVID(ctx, &workload.WITSVIDRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := stream.Recv()
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWITSVIDs(resp, false)
 }
 
 // FetchX509Bundles fetches the X.509 bundles.
@@ -156,6 +199,20 @@ func (c *Client) WatchX509Context(ctx context.Context, watcher X509ContextWatche
 	for {
 		err := c.watchX509Context(ctx, watcher, backoff)
 		watcher.OnX509ContextWatchError(err)
+		err = c.handleWatchError(ctx, err, backoff)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// WatchWITContext watches for updates to the WIT context. The watcher
+// receives the updated WIT context.
+func (c *Client) WatchWITContext(ctx context.Context, watcher WITContextWatcher) error {
+	backoff := c.config.backoffStrategy.NewBackoff()
+	for {
+		err := c.watchWITContext(ctx, watcher, backoff)
+		watcher.OnWITContextWatchError(err)
 		err = c.handleWatchError(ctx, err, backoff)
 		if err != nil {
 			return err
@@ -308,6 +365,37 @@ func (c *Client) watchX509Context(ctx context.Context, watcher X509ContextWatche
 	}
 }
 
+func (c *Client) watchWITContext(ctx context.Context, watcher WITContextWatcher, backoff Backoff) error {
+	ctx, cancel := context.WithCancel(withHeader(ctx))
+	defer cancel()
+
+	c.config.log.Debugf("Watching WIT contexts")
+	stream, err := c.wlClient.FetchWITSVID(ctx, &workload.WITSVIDRequest{})
+	if err != nil {
+		return err
+	}
+
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+
+		backoff.Reset()
+		witContext, err := parseWITContext(resp)
+		if err != nil {
+			c.config.log.Errorf("Failed to parse WIT-SVID response: %v", err)
+			watcher.OnWITContextWatchError(err)
+			continue
+		}
+		watcher.OnWITContextUpdate(witContext)
+	}
+}
+
+func parseWITContext(resp *workload.WITSVIDResponse) (*WITContext, error) {
+	return nil, nil
+}
+
 func (c *Client) watchJWTBundles(ctx context.Context, watcher JWTBundleWatcher, backoff Backoff) error {
 	ctx, cancel := context.WithCancel(withHeader(ctx))
 	defer cancel()
@@ -393,6 +481,17 @@ type X509BundleWatcher interface {
 	// OnX509BundlesWatchError is called when there is a problem establishing
 	// or maintaining connectivity with the Workload API.
 	OnX509BundlesWatchError(error)
+}
+
+// WITContextWatcher receives WITContext updates from the Workload API.
+type WITContextWatcher interface {
+	// OnWITContextUpdate is called with the latest X.509 context retrieved
+	// from the Workload API.
+	OnWITContextUpdate(*WITContext)
+
+	// OnWITContextWatchError is called when there is a problem establishing
+	// or maintaining connectivity with the Workload API.
+	OnWITContextWatchError(error)
 }
 
 func withHeader(ctx context.Context) context.Context {
@@ -562,4 +661,8 @@ func parseJWTSVIDBundles(resp *workload.JWTBundlesResponse) (*jwtbundle.Set, err
 	}
 
 	return jwtbundle.NewSet(bundles...), nil
+}
+
+func parseWITSVIDs(resp *workload.WITSVIDResponse, firstOnly bool) ([]*witsvid.SVID, error) {
+	return nil, nil
 }

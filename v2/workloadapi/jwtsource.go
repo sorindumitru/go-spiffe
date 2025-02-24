@@ -38,7 +38,7 @@ func NewJWTSource(ctx context.Context, options ...JWTSourceOption) (_ *JWTSource
 		picker: config.picker,
 	}
 
-	s.watcher, err = newWatcher(ctx, config.watcher, nil, s.setJWTBundles)
+	s.watcher, err = newWatcher(ctx, config.watcher, nil, s.setJWTBundles, nil)
 	if err != nil {
 		return nil, err
 	}

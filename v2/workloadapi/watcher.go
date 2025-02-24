@@ -42,9 +42,13 @@ type watcher struct {
 	jwtBundlesFn      func(*jwtbundle.Set)
 	jwtBundlesSet     chan struct{}
 	jwtBundlesSetOnce sync.Once
+
+	witContextFn      func(*WITContext)
+	witContextSet     chan struct{}
+	witContextSetOnce sync.Once
 }
 
-func newWatcher(ctx context.Context, config watcherConfig, x509ContextFn func(*X509Context), jwtBundlesFn func(*jwtbundle.Set)) (_ *watcher, err error) {
+func newWatcher(ctx context.Context, config watcherConfig, x509ContextFn func(*X509Context), jwtBundlesFn func(*jwtbundle.Set), witContextFn func(*WITContext)) (_ *watcher, err error) {
 	w := &watcher{
 		updatedCh:      make(chan struct{}, 1),
 		client:         config.client,
@@ -53,6 +57,8 @@ func newWatcher(ctx context.Context, config watcherConfig, x509ContextFn func(*X
 		x509ContextSet: make(chan struct{}),
 		jwtBundlesFn:   jwtBundlesFn,
 		jwtBundlesSet:  make(chan struct{}),
+		witContextFn:   witContextFn,
+		witContextSet:  make(chan struct{}),
 	}
 
 	// If this function fails, we need to clean up the source.
@@ -95,7 +101,7 @@ func newWatcher(ctx context.Context, config watcherConfig, x509ContextFn func(*X
 			defer w.wg.Done()
 			errCh <- w.client.WatchX509Context(watchCtx, w)
 		}()
-		if err := waitFor(w.x509ContextSet); err != nil {
+		if err := waitFor(w.witContextSet); err != nil {
 			return nil, err
 		}
 	}
@@ -107,6 +113,17 @@ func newWatcher(ctx context.Context, config watcherConfig, x509ContextFn func(*X
 			errCh <- w.client.WatchJWTBundles(watchCtx, w)
 		}()
 		if err := waitFor(w.jwtBundlesSet); err != nil {
+			return nil, err
+		}
+	}
+
+	if w.witContextFn != nil {
+		w.wg.Add(1)
+		go func() {
+			defer w.wg.Done()
+			errCh <- w.client.WatchX509Context(watchCtx, w)
+		}()
+		if err := waitFor(w.x509ContextSet); err != nil {
 			return nil, err
 		}
 	}

@@ -3,6 +3,7 @@ package workloadapi
 import (
 	"github.com/spiffe/go-spiffe/v2/logger"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
+	"github.com/spiffe/go-spiffe/v2/svid/witsvid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"google.golang.org/grpc"
 )
@@ -171,4 +172,15 @@ type withDefaultJWTSVIDPicker struct {
 
 func (o withDefaultJWTSVIDPicker) configureJWTSource(config *jwtSourceConfig) {
 	config.picker = o.picker
+}
+
+// WITSourceOption is an option for the WITSource. A SourceOption is also an
+// WITSourceOption.
+type WITSourceOption interface {
+	configureWITSource(*witSourceConfig)
+}
+
+type witSourceConfig struct {
+	watcher watcherConfig
+	picker  func([]*witsvid.SVID) *witsvid.SVID
 }

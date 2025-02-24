@@ -38,6 +38,20 @@ type SpiffeWorkloadAPIClient interface {
 	// Validates a JWT-SVID against the requested audience. Returns the SPIFFE
 	// ID of the JWT-SVID and JWT claims.
 	ValidateJWTSVID(ctx context.Context, in *ValidateJWTSVIDRequest, opts ...grpc.CallOption) (*ValidateJWTSVIDResponse, error)
+	// Fetch WIT-SVIDs for all SPIFFE identities the workload is entitled to,
+	// as well as related information like trust bundles. As this information
+	// changes, subsequent messages will be streamed from the server.
+	//
+	// Will return Unimplemented where Workload API endpoint does not support the
+	// WIT-SVID profile.
+	FetchWITSVID(ctx context.Context, in *WITSVIDRequest, opts ...grpc.CallOption) (SpiffeWorkloadAPI_FetchWITSVIDClient, error)
+	// Fetch trust bundles. Useful for clients that only need to validate SVIDs
+	// without obtaining an SVID for themselves. As this information changes,
+	// subsequent messages will be streamed from the server.
+	//
+	// Will return Unimplemented where Workload API endpoint does not support the
+	// WIT-SVID profile.
+	FetchWITBundles(ctx context.Context, in *WITBundlesRequest, opts ...grpc.CallOption) (SpiffeWorkloadAPI_FetchWITBundlesClient, error)
 }
 
 type spiffeWorkloadAPIClient struct {
@@ -162,6 +176,70 @@ func (c *spiffeWorkloadAPIClient) ValidateJWTSVID(ctx context.Context, in *Valid
 	return out, nil
 }
 
+func (c *spiffeWorkloadAPIClient) FetchWITSVID(ctx context.Context, in *WITSVIDRequest, opts ...grpc.CallOption) (SpiffeWorkloadAPI_FetchWITSVIDClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_SpiffeWorkloadAPI_serviceDesc.Streams[3], "/SpiffeWorkloadAPI/FetchWITSVID", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &spiffeWorkloadAPIFetchWITSVIDClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type SpiffeWorkloadAPI_FetchWITSVIDClient interface {
+	Recv() (*WITSVIDResponse, error)
+	grpc.ClientStream
+}
+
+type spiffeWorkloadAPIFetchWITSVIDClient struct {
+	grpc.ClientStream
+}
+
+func (x *spiffeWorkloadAPIFetchWITSVIDClient) Recv() (*WITSVIDResponse, error) {
+	m := new(WITSVIDResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *spiffeWorkloadAPIClient) FetchWITBundles(ctx context.Context, in *WITBundlesRequest, opts ...grpc.CallOption) (SpiffeWorkloadAPI_FetchWITBundlesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_SpiffeWorkloadAPI_serviceDesc.Streams[4], "/SpiffeWorkloadAPI/FetchWITBundles", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &spiffeWorkloadAPIFetchWITBundlesClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type SpiffeWorkloadAPI_FetchWITBundlesClient interface {
+	Recv() (*WITBundlesResponse, error)
+	grpc.ClientStream
+}
+
+type spiffeWorkloadAPIFetchWITBundlesClient struct {
+	grpc.ClientStream
+}
+
+func (x *spiffeWorkloadAPIFetchWITBundlesClient) Recv() (*WITBundlesResponse, error) {
+	m := new(WITBundlesResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SpiffeWorkloadAPIServer is the server API for SpiffeWorkloadAPI service.
 // All implementations must embed UnimplementedSpiffeWorkloadAPIServer
 // for forward compatibility
@@ -187,6 +265,20 @@ type SpiffeWorkloadAPIServer interface {
 	// Validates a JWT-SVID against the requested audience. Returns the SPIFFE
 	// ID of the JWT-SVID and JWT claims.
 	ValidateJWTSVID(context.Context, *ValidateJWTSVIDRequest) (*ValidateJWTSVIDResponse, error)
+	// Fetch WIT-SVIDs for all SPIFFE identities the workload is entitled to,
+	// as well as related information like trust bundles. As this information
+	// changes, subsequent messages will be streamed from the server.
+	//
+	// Will return Unimplemented where Workload API endpoint does not support the
+	// WIT-SVID profile.
+	FetchWITSVID(*WITSVIDRequest, SpiffeWorkloadAPI_FetchWITSVIDServer) error
+	// Fetch trust bundles. Useful for clients that only need to validate SVIDs
+	// without obtaining an SVID for themselves. As this information changes,
+	// subsequent messages will be streamed from the server.
+	//
+	// Will return Unimplemented where Workload API endpoint does not support the
+	// WIT-SVID profile.
+	FetchWITBundles(*WITBundlesRequest, SpiffeWorkloadAPI_FetchWITBundlesServer) error
 	mustEmbedUnimplementedSpiffeWorkloadAPIServer()
 }
 
@@ -208,6 +300,12 @@ func (UnimplementedSpiffeWorkloadAPIServer) FetchJWTBundles(*JWTBundlesRequest, 
 }
 func (UnimplementedSpiffeWorkloadAPIServer) ValidateJWTSVID(context.Context, *ValidateJWTSVIDRequest) (*ValidateJWTSVIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidateJWTSVID not implemented")
+}
+func (UnimplementedSpiffeWorkloadAPIServer) FetchWITSVID(*WITSVIDRequest, SpiffeWorkloadAPI_FetchWITSVIDServer) error {
+	return status.Errorf(codes.Unimplemented, "method FetchWITSVID not implemented")
+}
+func (UnimplementedSpiffeWorkloadAPIServer) FetchWITBundles(*WITBundlesRequest, SpiffeWorkloadAPI_FetchWITBundlesServer) error {
+	return status.Errorf(codes.Unimplemented, "method FetchWITBundles not implemented")
 }
 func (UnimplementedSpiffeWorkloadAPIServer) mustEmbedUnimplementedSpiffeWorkloadAPIServer() {}
 
@@ -321,6 +419,48 @@ func _SpiffeWorkloadAPI_ValidateJWTSVID_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SpiffeWorkloadAPI_FetchWITSVID_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WITSVIDRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SpiffeWorkloadAPIServer).FetchWITSVID(m, &spiffeWorkloadAPIFetchWITSVIDServer{stream})
+}
+
+type SpiffeWorkloadAPI_FetchWITSVIDServer interface {
+	Send(*WITSVIDResponse) error
+	grpc.ServerStream
+}
+
+type spiffeWorkloadAPIFetchWITSVIDServer struct {
+	grpc.ServerStream
+}
+
+func (x *spiffeWorkloadAPIFetchWITSVIDServer) Send(m *WITSVIDResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _SpiffeWorkloadAPI_FetchWITBundles_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WITBundlesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SpiffeWorkloadAPIServer).FetchWITBundles(m, &spiffeWorkloadAPIFetchWITBundlesServer{stream})
+}
+
+type SpiffeWorkloadAPI_FetchWITBundlesServer interface {
+	Send(*WITBundlesResponse) error
+	grpc.ServerStream
+}
+
+type spiffeWorkloadAPIFetchWITBundlesServer struct {
+	grpc.ServerStream
+}
+
+func (x *spiffeWorkloadAPIFetchWITBundlesServer) Send(m *WITBundlesResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _SpiffeWorkloadAPI_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "SpiffeWorkloadAPI",
 	HandlerType: (*SpiffeWorkloadAPIServer)(nil),
@@ -348,6 +488,16 @@ var _SpiffeWorkloadAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "FetchJWTBundles",
 			Handler:       _SpiffeWorkloadAPI_FetchJWTBundles_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "FetchWITSVID",
+			Handler:       _SpiffeWorkloadAPI_FetchWITSVID_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "FetchWITBundles",
+			Handler:       _SpiffeWorkloadAPI_FetchWITBundles_Handler,
 			ServerStreams: true,
 		},
 	},

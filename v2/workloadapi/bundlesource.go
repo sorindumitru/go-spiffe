@@ -41,7 +41,7 @@ func NewBundleSource(ctx context.Context, options ...BundleSourceOption) (_ *Bun
 		jwtAuthorities:  make(map[spiffeid.TrustDomain]map[string]crypto.PublicKey),
 	}
 
-	s.watcher, err = newWatcher(ctx, config.watcher, s.setX509Context, s.setJWTBundles)
+	s.watcher, err = newWatcher(ctx, config.watcher, s.setX509Context, s.setJWTBundles, nil)
 	if err != nil {
 		return nil, err
 	}
